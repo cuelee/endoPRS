@@ -13,3 +13,7 @@ Imports:
   bigsnpr,
   tidyverse,
   data.table
+Suggests:
+  knitr
+  rmarkdown
+VignetteBuilder: knitr, rmarkdown
