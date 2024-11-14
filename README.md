@@ -26,4 +26,4 @@ Further information can be found in the vignette.
 
 ## Citations
 Please cite:
-Kharitonova, E.V., et. al. EndoPRS: Incorporating Endophenotype Information to Improve Polygenic Risk Scores for Clinical Endpoints. **medRxiv** (2024).
+Kharitonova, E.V., et. al. EndoPRS: Incorporating Endophenotype Information to Improve Polygenic Risk Scores for Clinical Endpoints. *medRxiv*. (2024).
