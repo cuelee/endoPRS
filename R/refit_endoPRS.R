@@ -1,9 +1,8 @@
-#' Function to apply endoPRS method to generate a polygenic risk score model.
+#' Function to apply the second (refitting) step of the endoPRS method to generate a polygenic risk score model.
 #'
-#' This function applies the endoPRS model. It runsa weighted lasso model that penalizes the SNPs differently based on
-#' whether they are  associated with only the phenotype, only the endophenotype, or both. The optimal set of weights is
-#' determined by validation set performance. The model is then refit with the chosen weights on the combined training and
-#' validation set to obtain the final PRS model.
+#' This function applies the refitting step of the endoPRS model. It loads the results of fit_endoPRS_single_iter to determine
+#' the optimal chosen weights and GWAS p-value threshold in the validation set. It then refits the endoPRS model using these tuning
+#' parameters on the combined training and validation set to obtain the final PRS model. Must be used in combination with fit_endoPRS_single_iter.
 #'
 #'
 #' @param G An object of class FBM from the bigsnpr package that contains genotypes of the individuals used for training and those used for validation.
@@ -13,17 +12,15 @@
 #' @param train_covar A data frame corresponding with the covariates of the individuals used for training (ie genetic PC's, sex, age, etc). The first column must be FID, and the second column must be IID. The order of individuals must be the same as train_pheno. Covariates that are factors (i.e. assessment center) must be encoded as such. The covariates are not penalized in the endoPRS model.
 #' @param val_pheno A data frame with three columns corresponding to the phenotypes of individuals used for validation. Column one is FID, column two is IID, and column three is y the phenotype. If the phenotype is binary, y must consist of 0's and 1's.
 #' @param val_covar A data frame corresponding with the covariates of the individuals used for validation (ie genetic PC's, sex, age, etc). The first column must be FID, and the second column must be IID. The order of individuals must be the same as val_pheno. Covariates that are factors (i.e. assessment center) must be encoded as such. The covariates are not penalized in the endoPRS model.
-#' @param pheno_gwas A data frame containing the results of the GWAS run on the phenotype. It must not include any individuals from the validation set. It must contain columns corresponding to chromosome, SNP, allele1, allele2, and P-value.
-#' @param endo_gwas A data frame containing the results of the GWAS run on the endophenotype. It must not include any individuals from the validation set. It must contain columns corresponding to chromosome, SNP, allele1, allele2, and P-value.
+#' @param pheno_gwas A data frame containing the results of the GWAS run on the phenotype. It can be different than the one used in fit_endoPRS_single_iter as it can be run on the combined training and validation set. It must contain columns corresponding to chromosome, SNP, allele1, allele2, and P-value.
+#' @param endo_gwas A data frame containing the results of the GWAS run on the endophenotype. It can be different than the one used in fit_endoPRS_single_iter as it can be run on the combined training and validation set. It must contain columns corresponding to chromosome, SNP, allele1, allele2, and P-value.
 #' @param filter_hapmap An optional logical character. It corresponds to whether to only run the model on variants in the hapmap3 set.
 #' @param hapmap An optional data frame with hapmap variants. This must be provided if filter_hapmap is set to TRUE. The hapmap3 data frame should contain columns CHR, SNP, A1, A2.
 #' @param type An optional character vector of "linear" or "logistic." It specifies which type of model to fit to the data. If not provided, it will be learned from the phenotype. If the phenotype consists of 0's and 1's penalized logistic regression will be used, otherwie penalized linear regression will be used.
 #' @param threshes An optional character of p-value thresholds. This corresponds to the GWAS p-value thresholds used to determine association with the phenotype and endophenotype. The optimal p-value threshold is learned from tuning on the validation set. If not provided, the original values from the endoPRS manuscript will be used (0.01, 1e-4, and 1e-6).
-#' @param grid An optional data frame of weights to use for the weighted penalty in the lasso model. The first column must be w2 and correspond to the weights applied to the group of SNPs associated with only the endophenotype and the second column must be w3 and correspond to the weights applied to the group of SNPs associated with both the phenotype and endophenotype. The set of SNPs associated with only the phenotype is given a weight of 1. If not provided, the original grid of weights from the endoPRS manuscript (0.1, 0.5, 1, 2, 10) will be used for both w2 and w3.
 #' @param NCORES An optional value corresponding to the number of cores to use. Otherwise, the number of cores will be learned using nb_cores().
-#' @param pheno_gwas_refit An optional data frame containing the results of the GWAS run on the phenotype using both the training and validation set. It must contain columns corresponding to chromosome, SNP, allele1, allele2, and P-value.
-#' @param endo_gwas_refit An optional data frame containing the results of the GWAS run on the endophenotype using both the training and validation set. It must contain columns corresponding to chromosome, SNP, allele1, allele2, and P-value.
-#' @param save_folder An optional argument. If included, it should specify a path to a directory that files can be written to. If specified, all the models that are fit are saved to that directory. This is particularly useful for larger data sets, as model fitting can take a while, so saving intermediate results can prevent the need for rerunning the same models again.
+#' @param save_folder The path to a directory that contains the results of fit_endoPRS_single_iter when applied to the validation set.
+#' @param save_model An optional boolean value. Indicates whether to save the final model and beta values to disk. If set to true, the save_folder will be used.
 #'
 #' @return A list with two elements: the betas of the final model and the model itself
 #' \itemize{
@@ -32,15 +29,14 @@
 #' }
 #'
 #' @export
-fit_endoPRS = function(G, map, fam,
+refit_endoPRS = function(G, map, fam,
                        train_pheno, train_covar,
                        val_pheno, val_covar,
                        pheno_gwas, endo_gwas,
                        filter_hapmap = F, hapmap = NULL, type = NULL,
-                       threshes = c(1e-2, 1e-4, 1e-6),
-                       grid = NULL, NCORES = NULL,
-                       pheno_gwas_refit, endo_gwas_refit,
-                       save_folder = NULL){
+                       threshes = c(0.01, 1e-4, 1e-6), NCORES = NULL,
+                       save_folder,
+                       save_model = F){
 
   ## Check that there are no missing values
   if(any(is.na(train_pheno)) |  any(is.na(val_pheno)) |
@@ -144,96 +140,26 @@ fit_endoPRS = function(G, map, fam,
   ## Data frame to save validation results
   val_results = data.frame()
 
-  print(paste("Fitting grid of", nrow(grid),"models over threshes:", paste(threshes, collapse = ", ") ))
-
-  ## Select current thresh
+  ## Load the results of the models applied to validation
   for(thresh in threshes){
-
-    ## Obtain SNPs associated with pheno, with endo, and with both
-    snps_assoc =  extract_snp_groups(pheno_gwas, endo_gwas, map, thresh, filter_hapmap, hapmap)
-
-    ## Which SNPs to use
-    ind.col = which(map$unique_id %in% names(snps_assoc))
-
-    ## Print progress
-    print(paste("Progress for thresh:", thresh))
-
-    ## Create progress bar to track progress
-    pb = txtProgressBar(min = 0, max = nrow(grid), initial = 0, style = 3)
-    index = 0
-    for(iter in 1:25){
-
-      ## Create table of penalties to use
-      penalty_table = create_penalty_table(snps_assoc, map, ind.col, w2 = grid$w2[iter], w3 = grid$w3[iter])
-
-      ## Set seed for reproducibility
-      set.seed(1)
-
-
-      ## Fit endoPRS weighted model
-      model = fit_weighted_model(G, y.train, train_index, ind.col, penalty_table, covar.train, NCORES, type)
-
-      ## If save folder specified, save model
-      if(!is.null(save_folder)){
-        save_file = paste0(save_folder, "/trainingonly_model_thresh", thresh, "_w2", grid$w2[iter],"_w3", grid$w3[iter],".rds")
-        save(model, file = save_file)
+      for(iteration in 1:nrow(grid)){
+        save_file = paste0(save_folder, "/trainingonly_model_thresh", thresh, "_w2", grid$w2[iteration],"_w3", grid$w3[iteration],"_validationresults.csv")
+        res = read.csv(save_file)
+        val_results = rbind(val_results, res)
       }
-
-
-      ## Apply to validation set
-      pred_val <- predict(model, G, val_index, covar.row = covar.val)
-
-
-      ## Performance in validation set
-      if(type == "linear"){
-        val_perf = cor(pred_val, y.val)^2
-      }
-
-      ## Performance in validation set
-      if(type == "logistic"){
-        val_perf = AUC(pred_val, y.val)
-      }
-
-      ## Save results
-      res = data.frame(thresh = thresh, w2 = grid$w2[iter],
-                       w3 = grid$w3[iter], val_res = val_perf)
-      val_results = rbind(val_results, res)
-
-      ## Show progress in progress bar
-      index = index + 1
-      setTxtProgressBar(pb,index)
-    }
-
-    ## Print when all models in grid done fitting for one threshold
-    close(pb)
-    print(paste("Thresh:", thresh, " is complete"))
   }
 
-  ## If save folder specified, save results
-  if(!is.null(save_folder)){
-    save_file = paste0(save_folder, "/trainingonly_models_results.csv")
-    write.csv(val_results, file = save_file)
-  }
+  ## Determine the best performing model
+  best_performing_model = val_results[which.max(val_res),]
+  print(paste("Best Peforming Model Corresponds to Thresh:", best_performing_model$thresh,
+              "w2:", best_performing_model$w2, "w3:", best_performing_model$w3 ))
 
 
   #######################################################################################
   ###########     Part 5: Refit using combined training + validation     ################
   #######################################################################################
 
-  print(paste("Best Peforming Model Corresponds to Thresh:", best_performing_model$thresh,
-              "w2:", best_performing_model$w2, "w3:", best_performing_model$w3 ))
-  print("Start refitting model with combined training and validation set.")
 
-  ## Determine which model is best performing
-  best_performing_model  = val_results[which.max(val_results$val_res),]
-
-
-  ## If alternate gwas using combined training+validation set provided, use those SNPs for refitting
-  if(!is.null(pheno_gwas_refit) & !is.null(endo_gwas_refit) ){
-    pheno_gwas = pheno_gwas_refit
-    endo_gwas = endo_gwas_refit
-    print("Using refit summary statistics")
-  }
 
   ## Set thresh and weights for refitting
   thresh = best_performing_model$thresh
@@ -253,7 +179,7 @@ fit_endoPRS = function(G, map, fam,
   model = fit_weighted_model(G, c(y.train,y.val), c(train_index,val_index),
                              ind.col, penalty_table, rbind(covar.train, covar.val), NCORES, type)
   ## If save folder specified, save model
-  if(!is.null(save_folder)){
+  if(!is.null(save_model)){
     save_file = paste0(save_folder, "/combined_trainval_thresh", thresh, "_w2", w2,"_w3", w3,".rds")
     save(model, file = save_file)
   }

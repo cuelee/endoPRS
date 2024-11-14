@@ -21,7 +21,7 @@ endoPRS <- fit_endoPRS(G, map, fam,
                        pheno_gwas_refit, endo_gwas_refit, 
                        save_folder = NULL)
 ```
-Further information can be found in the vignette. 
+Further information can be found in the vignette provided in the vignettes folder. 
 
 
 ## Citations
