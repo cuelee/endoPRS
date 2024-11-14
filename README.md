@@ -27,4 +27,5 @@ However, a relatively large number of models is fit in the grid search so this c
 
 ## Citations
 Please cite:
+
 Kharitonova, E.V., et. al. EndoPRS: Incorporating Endophenotype Information to Improve Polygenic Risk Scores for Clinical Endpoints. *medRxiv*. (2024).
