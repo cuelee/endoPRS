@@ -36,7 +36,7 @@ refit_endoPRS = function(G, map, fam,
                        filter_hapmap = F, hapmap = NULL, type = NULL,
                        threshes = c(0.01, 1e-4, 1e-6), NCORES = NULL,
                        save_folder,
-                       save_model = F){
+                       save_model = T){
 
   ## Check that there are no missing values
   if(any(is.na(train_pheno)) |  any(is.na(val_pheno)) |
