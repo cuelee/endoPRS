@@ -14,8 +14,8 @@ Imports:
   tidyverse,
   data.table
 Suggests:
-  knitr
+  knitr,
   rmarkdown
 VignetteBuilder: 
-  knitr
+  knitr,
   rmarkdown
