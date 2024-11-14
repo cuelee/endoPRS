@@ -16,4 +16,6 @@ Imports:
 Suggests:
   knitr
   rmarkdown
-VignetteBuilder: knitr, rmarkdown
+VignetteBuilder: 
+  knitr
+  rmarkdown
