@@ -220,13 +220,14 @@ fit_endoPRS = function(G, map, fam,
   ###########     Part 5: Refit using combined training + validation     ################
   #######################################################################################
 
+  ## Determine which model is best performing
+  best_performing_model  = val_results[which.max(val_results$val_res),]
+  
   print(paste("Best Peforming Model Corresponds to Thresh:", best_performing_model$thresh,
               "w2:", best_performing_model$w2, "w3:", best_performing_model$w3 ))
   print("Start refitting model with combined training and validation set.")
 
-  ## Determine which model is best performing
-  best_performing_model  = val_results[which.max(val_results$val_res),]
-
+  
 
   ## If alternate gwas using combined training+validation set provided, use those SNPs for refitting
   if(!is.null(pheno_gwas_refit) & !is.null(endo_gwas_refit) ){
