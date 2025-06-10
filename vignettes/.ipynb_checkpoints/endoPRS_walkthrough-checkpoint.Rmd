@@ -1,0 +1,109 @@
+---
+title: "Walkthrough of endoPRS package"
+date: "Nov 13, 2024"
+author: "Elena Kharitonova"
+output: rmarkdown::html_document
+vignette: |
+  %\VignetteIndexEntry{Walkthrough of endoPRS package}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## endoPRS Walkthrough
+
+This is a walkthrough of how to use the endoPRS package.
+
+
+### Step 1: Load the necessary data
+
+First, we need to load the necessary data. For this example, we use the example genotype data provided in the bigsnpr package. 
+
+```{r}
+## Load bigsnpr data and load the example genotype data
+library(bigsnpr)
+bedfile <- system.file("extdata", "example.bed", package = "bigsnpr")
+rds <- snp_readBed(bedfile, backingfile = tempfile())
+test <- snp_attach(rds)
+
+## Specify the genotype, snp information, and participant information
+G = test$genotypes # Genotypes
+map = test$map # SNP information
+fam  = test$fam # Participant information
+```
+
+Next, we load the example phenotype, endophenotype, and GWAS data provided in the endoPRS package. As well as the example train, test, and validation split.
+
+```{r}
+## Load endoPRS package
+library(endoPRS)
+
+## Load GWAS information for phenotype and endophenotype
+data(pheno_gwas) # GWAS of phenotype ran on training set
+data(endo_gwas) # GWAS of endophenotype ran on training set
+data(pheno_gwas_refit) # GWAS of phenotype ran on combined training and validation set
+data(endo_gwas_refit) # GWAS of endophenotype ran on combined training and validation set
+
+## Load phenotype information of training, validation, and testing individuals
+data(train_pheno) # Training set phenotypes
+data(val_pheno) # Validation set phenotypes
+data(test_pheno) # Testing set phenotypes
+
+## Load covariate information of training, validation, and testing individuals
+data(train_covar) # Training set covariates
+data(val_covar) # Validation set covariates
+data(test_covar) # Testing set covariates
+```
+
+
+### Step 2: Fit endoPRS model.
+
+We fit endoPRS using the `fit_endoPRS()` function. In the paper, we used only the hapmap variants and we recommend doing this by setting `filter_hapmap` to `T` and providing a hapmap data frame. An example hapmap data frame can be seen using `data(hapmap_EUR)`.  
+
+Additionally, we recommend setting the save_folder to a path where intermediate model reuslts can be save. 
+```{r}
+## Fit endo PRS model
+endoPRS = fit_endoPRS(G, map, fam, 
+                       train_pheno, train_covar,
+                       val_pheno, val_covar,
+                       pheno_gwas, endo_gwas,
+                       filter_hapmap = F,  hapmap = NULL, 
+                       pheno_gwas_refit, endo_gwas_refit, 
+                       save_folder = NULL)
+```
+
+The results endoPRS model consists of two objects. A data frame consisting of the estimated coefficients called "beta". This can be saved and used to apply endoPRS to an external cohort, such as by using PLINK software. The other is the model itself called "model." It is an object of class big_sp_list.
+```{r}
+## Estimated coefficients in beta column
+## This can be used to apply the resulting endoPRS to an external cohort
+head(endoPRS$beta)
+
+## Resulting endoPRS model, an object of class big_sp_list.
+str(endoPRS$model)
+```
+
+### Step 3: Apply endoPRS model to test set
+
+We can apply the resulting endoPRS model to a test set using the predict function from the bigsnpr package. If interested in just the polygenic risk score be sure to set the covariate information to be a matrix of 0's. 
+
+```{r}
+## Determine index corresponding to individuals in test set
+test_id = paste(test_covar$family.ID, test_covar$sample.ID, sep = "_") ## Test set ID's
+geno_id = paste(fam[,1], fam[,2], sep = "_") ## All ID's in G
+test_index = match(test_id, geno_id) ## Which ID's correspond to testing
+
+
+## Apply endoPRS model- covariates set to be a matrix of 0's
+test_pred = predict(endoPRS$model, 
+                    G, 
+                    test_index, 
+                    covar.row = matrix(0, nrow = nrow(test_pheno), ncol = 9))
+
+## Examine R^2 of test set
+test_r2 = cor(test_pred, test_pheno$pheno)^2
+test_r2 ## Model performs well
+```
+

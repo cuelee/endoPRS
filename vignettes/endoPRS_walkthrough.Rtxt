@@ -1,0 +1,38 @@
+## Load bigsnpr data and load the example genotype data
+library(bigsnpr)
+bedfile <- system.file("extdata", "example.bed", package = "bigsnpr")
+rds <- snp_readBed(bedfile, backingfile = tempfile())
+test <- snp_attach(rds)
+
+## Specify the genotype, snp information, and participant information
+G = test$genotypes # Genotypes
+map = test$map # SNP information
+fam  = test$fam # Participant information
+
+## Load endoPRS package
+library(endoPRS)
+
+## Load GWAS information for phenotype and endophenotype
+data(pheno_gwas) # GWAS of phenotype ran on training set
+data(endo_gwas) # GWAS of endophenotype ran on training set
+data(pheno_gwas_refit) # GWAS of phenotype ran on combined training and validation set
+data(endo_gwas_refit) # GWAS of endophenotype ran on combined training and validation set
+
+## Load phenotype information of training, validation, and testing individuals
+data(train_pheno) # Training set phenotypes
+data(val_pheno) # Validation set phenotypes
+data(test_pheno) # Testing set phenotypes
+
+## Load covariate information of training, validation, and testing individuals
+data(train_covar) # Training set covariates
+data(val_covar) # Validation set covariates
+data(test_covar) # Testing set covariates
+
+## Fit endo PRS model
+endoPRS = fit_endoPRS(G, map, fam, 
+                       train_pheno, train_covar,
+                       val_pheno, val_covar,
+                       pheno_gwas, endo_gwas,
+                       filter_hapmap = F,  hapmap = NULL, 
+                       pheno_gwas_refit, endo_gwas_refit, 
+                       save_folder = NULL)
