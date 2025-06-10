@@ -15,40 +15,26 @@
 
 ## Function to extract snps associated with pheno, with endo, and with both
 extract_snp_groups <- function(pheno_gwas, endo_gwas, map, thresh, filter_hapmap, hapmap) {
-  
-  ## Clean GWAS column names and add unique ID
+  # Clean and deduplicate GWAS inputs
   pheno_gwas_clean <- format_gwas(pheno_gwas, map, filter_hapmap, hapmap)
   endo_gwas_clean  <- format_gwas(endo_gwas,  map, filter_hapmap, hapmap)
-  
-  ## Remove duplicated SNPs based on (CHR, BP)
-  pheno_gwas_clean <- pheno_gwas_clean[!duplicated(pheno_gwas_clean[, c("CHR", "BP")]), ]
-  endo_gwas_clean  <- endo_gwas_clean[!duplicated(endo_gwas_clean[, c("CHR", "BP")]), ]
-  
-  ## Filter GWAS by p-value threshold
-  pheno_gwas_thresh <- pheno_gwas_clean[pheno_gwas_clean$P < thresh, ]
-  endo_gwas_thresh  <- endo_gwas_clean[endo_gwas_clean$P < thresh, ]
-  
-  ## Label SNPs by trait
-  df_pheno    <- data.frame(SNP = pheno_gwas_thresh$unique_id, trait = "pheno")
-  df_endo     <- data.frame(SNP = endo_gwas_thresh$unique_id, trait = "endo")
-  df_combined <- rbind(df_pheno, df_endo)
-  
-  ## Assign SNP groups
-  snps_assoc_tab <- table(df_combined$SNP)
-  snps_assoc     <- rep(NA_character_, length(snps_assoc_tab))
-  names(snps_assoc) <- names(snps_assoc_tab)
-  
-  snps_assoc[snps_assoc_tab == 2] <- "both"
-  snps_assoc[snps_assoc_tab == 1 & names(snps_assoc_tab) %in% df_pheno$SNP] <- "pheno_only"
-  snps_assoc[snps_assoc_tab == 1 & names(snps_assoc_tab) %in% df_endo$SNP]  <- "endo_only"
-  
-  ## Drop any unassigned (should not exist, but safe)
-  snps_assoc <- snps_assoc[!is.na(snps_assoc)]
-  
-  ## Sanity check
-  if (!all(snps_assoc %in% c("pheno_only", "endo_only", "both"))) {
-    stop("snps_assoc contains invalid group labels.")
-  }
-  
+
+  pheno_gwas_clean <- pheno_gwas_clean[!duplicated(pheno_gwas_clean$unique_id), ]
+  endo_gwas_clean  <- endo_gwas_clean[!duplicated(endo_gwas_clean$unique_id),  ]
+
+  # Extract significant SNPs
+  pheno_sig <- pheno_gwas_clean$unique_id[pheno_gwas_clean$P < thresh]
+  endo_sig  <- endo_gwas_clean$unique_id[endo_gwas_clean$P < thresh]
+
+  # Create named character vector efficiently
+  snps_assoc <- character()
+  snps_assoc[pheno_sig] <- "pheno_only"
+  snps_assoc[endo_sig]  <- ifelse(endo_sig %in% names(snps_assoc), "both", "endo_only")
+
+  # Sanity check
+  allowed <- c("pheno_only", "endo_only", "both")
+  if (any(!snps_assoc %in% allowed)) stop("Unexpected values in snps_assoc.")
+
   return(snps_assoc)
 }
+
