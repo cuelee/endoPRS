@@ -148,7 +148,7 @@ fit_endoPRS = function(G, map, fam,
         snps_assoc =  extract_snp_groups(pheno_gwas, endo_gwas, map, thresh, filter_hapmap, hapmap)
         
         ## Which SNPs to use
-        valid_ids  <- intersect(map$unique_id[ind.col], names(snps_assoc))
+        valid_ids  <- intersect(map$unique_id, names(snps_assoc))
         snps_assoc <- snps_assoc[valid_ids]
         ind.col <- which(map$unique_id %in% valid_ids)
         
