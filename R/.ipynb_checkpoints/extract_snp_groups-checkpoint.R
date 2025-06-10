@@ -35,6 +35,9 @@ extract_snp_groups <- function(pheno_gwas, endo_gwas, map, thresh, filter_hapmap
   allowed <- c("pheno_only", "endo_only", "both")
   if (any(!snps_assoc %in% allowed)) stop("Unexpected values in snps_assoc.")
 
+  # Print counts per category
+  cat("SNP category counts:\n")
+  print(table(snps_assoc))
+
   return(snps_assoc)
 }
-

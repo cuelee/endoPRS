@@ -13,19 +13,30 @@
 #' @return a data frame that contains the name of the SNP, the group (pheno only, endo only, or both), and the associated penalty to be used in the weighted lasso model.
 
 ## Function to create table of penalties
-create_penalty_table = function(snps_assoc, map, ind.col, w2, w3){
+create_penalty_table <- function(snps_assoc, map, ind.col, w2, w3) {
+  # Extract unique_ids from map using provided indices
+  snp_ids <- map$unique_id[ind.col]
 
-  ## Create penalty table - with SNP IDs and with group it is
-  penalty_table = data.frame(RSID = names(snps_assoc)[match(map$unique_id[ind.col],names(snps_assoc))],
-                             group = as.character(snps_assoc)[match(map$unique_id[ind.col],names(snps_assoc))])
+  # Match group labels from snps_assoc by name
+  snp_groups <- as.character(snps_assoc[snp_ids])
 
-  ## Create penalty factor - w2 for endo only, and w3 for both
-  penalty_table$penalty = NA
-  penalty_table$penalty[penalty_table$group == "pheno_only"] = 1
-  penalty_table$penalty[penalty_table$group == "endo_only"] = w2
-  penalty_table$penalty[penalty_table$group == "both"] = w3
+  # Construct data frame
+  penalty_table <- data.frame(
+    RSID = snp_ids,
+    group = snp_groups,
+    penalty = NA_real_,
+    stringsAsFactors = FALSE
+  )
 
-  ## Return penalty table
+  # Assign penalties
+  penalty_table$penalty[penalty_table$group == "pheno_only"] <- 1
+  penalty_table$penalty[penalty_table$group == "endo_only"]  <- w2
+  penalty_table$penalty[penalty_table$group == "both"]       <- w3
+
+  # Optional sanity check
+  if (anyNA(penalty_table$penalty)) {
+    warning("Some SNPs in map$unique_id[ind.col] do not have a valid group in snps_assoc.")
+  }
+
   return(penalty_table)
 }
-

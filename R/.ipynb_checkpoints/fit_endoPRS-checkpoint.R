@@ -133,84 +133,63 @@ fit_endoPRS = function(G, map, fam,
 
     
     #######################################################################################
-    ##################      Part 4: Fit Weighted Model over grid     ######################
+    ##################      Part 4: Fit Weighted Model over Grid     ######################
     #######################################################################################
     
-    ## Data frame to save validation results
-    val_results = data.frame()
+    val_results <- data.frame()
     
-    print(paste("Fitting grid of", nrow(grid),"models over threshes:", paste(threshes, collapse = ", ") ))
+    cat("Fitting grid of", nrow(grid), "models over threshes:", paste(threshes, collapse = ", "), "\n")
     
-    ## Select current thresh
-    for(thresh in threshes){
-        
-        ## Obtain SNPs associated with pheno, with endo, and with both
-        snps_assoc =  extract_snp_groups(pheno_gwas, endo_gwas, map, thresh, filter_hapmap, hapmap)
-        
-        ## Which SNPs to use
-        valid_ids  <- intersect(map$unique_id, names(snps_assoc))
-        snps_assoc <- snps_assoc[valid_ids]
-        ind.col <- which(map$unique_id %in% valid_ids)
-        
-        ## Print progress
-        print(paste("Progress for thresh:", thresh))
-        
-        ## Create progress bar to track progress
-        pb = txtProgressBar(min = 0, max = nrow(grid), initial = 0, style = 3)
-        index = 0
-        for(iter in 1:nrow(grid)){
-        
-          ## Create table of penalties to use
-          penalty_table = create_penalty_table(snps_assoc, map, ind.col, w2 = grid$w2[iter], w3 = grid$w3[iter])
-        
-          ## Set seed for reproducibility
-          set.seed(1)
-        
-        
-          ## Fit endoPRS weighted model
-          model = fit_weighted_model(G, y.train, train_index, ind.col, penalty_table, covar.train, NCORES, type)
-          # model = fit_weighted_model(G, y.train, train_index, ind.col, penalty_table, covar.train, NCORES, type = 'linear') # CUE FIXED it
-        
-          ## If save folder specified, save model
-          if(!is.null(save_folder)){
-            save_file = paste0(save_folder, "/trainingonly_model_thresh", thresh, "_w2", grid$w2[iter],"_w3", grid$w3[iter],".rds")
-            save(model, file = save_file)
-          }
-        
-        
-          ## Apply to validation set
-          pred_val <- predict(model, G, val_index, covar.row = covar.val)
-        
-        
-          ## Performance in validation set
-          if(type == "linear"){
-            val_perf = cor(pred_val, y.val)^2
-          }
-        
-          ## Performance in validation set
-          if(type == "logistic"){
-            val_perf = AUC(pred_val, y.val)
-          }
-        
-          ## Save results
-          res = data.frame(thresh = thresh, w2 = grid$w2[iter],
-                           w3 = grid$w3[iter], val_res = val_perf)
-          val_results = rbind(val_results, res)
-        
-          ## Show progress in progress bar
-          index = index + 1
-          setTxtProgressBar(pb,index)
+    for (thresh in threshes) {
+    
+      # Extract SNP associations
+      snps_assoc <- extract_snp_groups(pheno_gwas, endo_gwas, map, thresh, filter_hapmap, hapmap)
+    
+      # Filter and match SNPs
+      valid_ids  <- intersect(map$unique_id, names(snps_assoc))
+      snps_assoc <- snps_assoc[valid_ids]
+      ind.col    <- which(map$unique_id %in% valid_ids)
+    
+      cat("Using", length(ind.col), "SNPs for threshold", thresh, "\n")
+    
+      pb <- txtProgressBar(min = 0, max = nrow(grid), style = 3)
+      for (iter in seq_len(nrow(grid))) {
+    
+        # Generate penalty table
+        penalty_table <- create_penalty_table(snps_assoc, map, ind.col, w2 = grid$w2[iter], w3 = grid$w3[iter])
+    
+        set.seed(1)
+        model <- fit_weighted_model(G, y.train, train_index, ind.col, penalty_table, covar.train, NCORES, type)
+    
+        # Save model if path specified
+        if (!is.null(save_folder)) {
+          save_file <- file.path(save_folder, sprintf("trainingonly_model_thresh%s_w2%s_w3%s.rds", thresh, grid$w2[iter], grid$w3[iter]))
+          save(model, file = save_file)
         }
-        
-        ## Print when all models in grid done fitting for one threshold
-        close(pb)
-        print(paste("Thresh:", thresh, " is complete"))
+    
+        # Predict and evaluate
+        pred_val <- predict(model, G, val_index, covar.row = covar.val)
+    
+        val_perf <- if (type == "linear") {
+          cor(pred_val, y.val)^2
+        } else if (type == "logistic") {
+          AUC(pred_val, y.val)
+        } else {
+          stop("Invalid model type: must be 'linear' or 'logistic'")
+        }
+    
+        val_results <- rbind(val_results, data.frame(thresh = thresh, w2 = grid$w2[iter],
+                                                     w3 = grid$w3[iter], val_res = val_perf))
+    
+        setTxtProgressBar(pb, iter)
+      }
+    
+      close(pb)
+      cat("Finished threshold:", thresh, "\n")
     }
     
-    ## If save folder specified, save results
-    if(!is.null(save_folder)){
-    save_file = paste0(save_folder, "/trainingonly_models_results.csv")
-    write.csv(val_results, file = save_file)
+    if (!is.null(save_folder)) {
+      write.csv(val_results, file = file.path(save_folder, "trainingonly_models_results.csv"), row.names = FALSE)
     }
 
 
