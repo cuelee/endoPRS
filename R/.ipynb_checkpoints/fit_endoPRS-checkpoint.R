@@ -42,6 +42,8 @@ fit_endoPRS = function(G, map, fam,
                        pheno_gwas_refit, endo_gwas_refit,
                        save_folder = NULL){
 
+    bigstatsr::assert_cores(NCORES)  # Enforce safe core usage
+    
     ## Check that there are no missing values
     if(any(is.na(train_pheno)) |  any(is.na(val_pheno)) |
      any(is.na(train_covar)) | any(is.na(val_covar)) ){
@@ -65,8 +67,8 @@ fit_endoPRS = function(G, map, fam,
     }
     
     ## Parallelize
-    if(is.null(NCORES)){
-    NCORES = nb_cores()
+    if (is.null(NCORES)) {
+      NCORES <- bigstatsr::nb_cores()
     }
     
     ## Create grid of weights
