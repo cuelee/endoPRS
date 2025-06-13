@@ -42,15 +42,6 @@ fit_endoPRS = function(G, map, fam,
                        pheno_gwas_refit, endo_gwas_refit,
                        save_folder = NULL){
 
-    if (NCORES > 1 && bigstatsr::nb_cores() > 1) {
-      message("Nested parallelism detected. Setting NCORES = 1 to avoid conflict.")
-      NCORES <- 1
-    }
-    
-    if (is.null(NCORES)) {
-      NCORES <- bigstatsr::nb_cores()
-    }
-
     ## Check that there are no missing values
     if(any(is.na(train_pheno)) |  any(is.na(val_pheno)) |
      any(is.na(train_covar)) | any(is.na(val_covar)) ){
