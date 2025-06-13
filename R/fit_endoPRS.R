@@ -159,6 +159,11 @@ fit_endoPRS = function(G, map, fam,
         penalty_table <- create_penalty_table(snps_assoc, map, ind.col, w2 = grid$w2[iter], w3 = grid$w3[iter])
     
         set.seed(1)
+          
+        cat("Thread usage before fit_endoPRS:\n")
+        print(system("ps -o pid,ppid,nlwp,pcpu,pmem,comm -p $$", intern = TRUE), sep = "\n")
+        flush.console()
+          
         model <- fit_weighted_model(G, y.train, train_index, ind.col, penalty_table, covar.train, NCORES, type)
     
         # Save model if path specified
